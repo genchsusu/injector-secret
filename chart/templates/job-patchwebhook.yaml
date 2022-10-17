@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name:  {{ $.Values.name }}-tls-patcher
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app: {{ $.Values.name }}-tls-patcher
+spec:
+  ttlSecondsAfterFinished: 0
+  template:
+    metadata:
+      name:  {{ $.Values.name }}-tls-patcher
+      labels:
+        app: {{ $.Values.name }}-tls-patcher
+    spec:
+      containers:
+      - name: patch
+        image: jettech/kube-webhook-certgen:v1.5.1
+        imagePullPolicy: IfNotPresent
+        args:
+        - patch
+        - --patch-mutating=true
+        - --patch-validating=false
+        - --webhook-name={{ $.Values.name }}
+        - --namespace={{ .Release.Namespace }}
+        - --secret-name={{ $.Values.name }}
+        - --patch-failure-policy=Fail
+        resources:
+          limits:
+            cpu: 200m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      restartPolicy: OnFailure
+      serviceAccountName: {{ $.Values.name }}
+      securityContext:
+        runAsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 2000

@@ -1,0 +1,5 @@
+image: "injector-secret:latest"
+
+name: "injector-secret"
+secretName: "xxx"
+# excludeNamespaces: ["kube-system"]

@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Values.name }}
+  labels:
+    app: {{ $.Values.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Values.name }}
+    spec:
+      serviceAccountName: {{ $.Values.name }}
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: {{ $.Values.name }}
+      imagePullSecrets:
+      - name: {{ .Values.secretName }}
+      containers:
+      - name: app
+        image: "{{ $.Values.image }}"
+        imagePullPolicy: Always
+        args:
+        - -alsologtostderr
+        - -v=4
+        - 2>&1
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /etc/webhook/certs
+          readOnly: true
+        env:
+        - name: CONFIG_PORT
+          value: "8080"
+        - name: CONFIG_TARGET_SECRET_NAME
+          value: {{ .Values.secretName | quote }}
+        # - name: CONFIG_EXCLUDE_NAMESPACES
+        #   value: {{ join "," .Values.excludeNamespaces | quote }}
+      - name: tls-proxy
+        image: squareup/ghostunnel:v1.4.1
+        imagePullPolicy: IfNotPresent
+        args:
+        - server
+        - --listen=:8443
+        - --target=127.0.0.1:8080
+        - --key=cert/key
+        - --cert=cert/cert
+        - --disable-authentication
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /cert
+          name: webhook-certs
+          readOnly: true
